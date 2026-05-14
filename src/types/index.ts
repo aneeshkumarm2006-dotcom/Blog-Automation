@@ -23,16 +23,47 @@ export type BlogStatus =
   | "humanized"
   | "failed";
 
+// Matches the strict JSON schema in `context/skills/site-analysis.md`.
+// Zod validation lives in `src/lib/schemas.ts` (siteAnalysisSchema); this
+// interface is the persisted shape after parsing.
+export interface SiteAnalysisAudience {
+  primary: string | null;
+  role_seniority: string | null;
+  expertise_level: string | null;
+}
+
+export interface SiteAnalysisTone {
+  summary: string | null;
+  sample_phrases: string[] | null;
+}
+
+export interface SiteAnalysisExistingContent {
+  topics_covered: string[] | null;
+  dominant_format: string | null;
+  avg_length_words: number | null;
+}
+
+export interface SiteAnalysisCompetitor {
+  name: string | null;
+  url: string | null;
+  publishing_cadence: string | null;
+  content_focus: string | null;
+}
+
+export interface SiteAnalysisCitationSurface {
+  optimized: boolean | null;
+  evidence: string | null;
+}
+
 export interface SiteAnalysis {
-  niche: string;
-  audience: string;
-  tone: string;
-  existingTopics: string[];
-  contentGaps: string[];
-  competitiveAngles?: string[];
-  brandVoiceNotes?: string;
-  recommendedFormats?: string[];
-  [key: string]: unknown;
+  niche: string | null;
+  audience: SiteAnalysisAudience | null;
+  tone: SiteAnalysisTone | null;
+  existing_content: SiteAnalysisExistingContent | null;
+  content_gaps: string[] | null;
+  competitors: SiteAnalysisCompetitor[] | null;
+  ai_citation_surface: SiteAnalysisCitationSurface | null;
+  differentiation_hooks: string[] | null;
 }
 
 export interface Session {
