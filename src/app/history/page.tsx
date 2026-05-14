@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function HistoryPage() {
   const sessions = await listSessions();
   return (
-    <AppShell width="wide" footerSlot={<span>Personal use only</span>}>
+    <AppShell width="wide">
       <HistoryView sessions={sessions.map(toClientSession)} />
     </AppShell>
   );

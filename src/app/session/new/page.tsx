@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function NewSessionPage() {
   return (
-    <AppShell footerSlot={<span>Personal use only</span>}>
+    <AppShell>
       <header className="mb-8">
         <p className="text-xs uppercase tracking-wider text-fg-muted">
           Step 1 of 3

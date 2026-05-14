@@ -14,7 +14,7 @@ import { Progress } from "@/components/ui/Progress";
 
 export default function Home() {
   return (
-    <AppShell footerSlot={<span>Personal use only</span>}>
+    <AppShell >
       <header className="mb-8">
         <p className="text-xs uppercase tracking-wider text-fg-muted">
           Design system

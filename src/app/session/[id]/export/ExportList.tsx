@@ -59,11 +59,7 @@ function formatDate(iso: string): string {
 }
 
 function previewOf(text: string): string {
-  // Strip yaml frontmatter and keep the first ~700 characters of body for a
-  // monospace preview block — enough to show the lede without dominating the
-  // card.
-  const stripped = text.replace(/^---[\s\S]*?---\n?/, "").trim();
-  return stripped.length > 700 ? stripped.slice(0, 700).trimEnd() + "…" : stripped;
+  return text.replace(/^---[\s\S]*?---\n?/, "").trim();
 }
 
 export function ExportList({

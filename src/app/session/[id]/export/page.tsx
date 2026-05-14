@@ -53,7 +53,7 @@ export default async function ExportPage({ params }: PageProps) {
   const [blogs, ideas] = await Promise.all([listBlogs(id), listIdeas(id)]);
 
   return (
-    <AppShell width="wide" footerSlot={<span>Personal use only</span>}>
+    <AppShell width="wide" >
       <ExportList
         sessionId={id}
         session={toClientSession(session)}

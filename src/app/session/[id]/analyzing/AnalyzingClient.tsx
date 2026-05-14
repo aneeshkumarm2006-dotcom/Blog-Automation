@@ -38,13 +38,6 @@ const STEPS = [
 const POLL_INTERVAL_MS = 2000;
 const STEP_ADVANCE_MS = 9000;
 
-const TERMINAL_LINES = [
-  { kind: "ok", text: "[200 OK] /" },
-  { kind: "ok", text: "[200 OK] /blog" },
-  { kind: "warn", text: "[404] /old-page (missing redirect)" },
-  { kind: "active", text: "Extracting H1 tags & schema markup..." },
-] as const;
-
 type StepState = "done" | "active" | "pending";
 
 function getStepState(stepIndex: number, activeIndex: number): StepState {
@@ -171,8 +164,6 @@ export function AnalyzingClient({
           <Stepper activeStep={activeStep} />
         )}
 
-        {!isFailed ? <TerminalPreview activeStep={activeStep} /> : null}
-
         <footer className="mt-6 flex items-center justify-between gap-3">
           <p className="text-xs text-fg-muted">
             {isFailed
@@ -180,7 +171,7 @@ export function AnalyzingClient({
               : (
                 <>
                   This usually takes{" "}
-                  <span className="font-medium text-fg">15–30 seconds</span>
+                  <span className="font-medium text-fg">2–3 min</span>
                 </>
               )}
           </p>
@@ -291,70 +282,6 @@ function Stepper({ activeStep }: { activeStep: number }) {
         );
       })}
     </ol>
-  );
-}
-
-function TerminalPreview({ activeStep }: { activeStep: number }) {
-  // Reveal terminal lines progressively as the steps advance.
-  const visible = Math.min(
-    TERMINAL_LINES.length,
-    2 + Math.max(0, activeStep),
-  );
-  return (
-    <div className="overflow-hidden rounded border border-border bg-[#0a0a0a]">
-      <div className="flex h-7 items-center gap-1.5 border-b border-border bg-surface-high px-3">
-        <span aria-hidden className="h-2 w-2 rounded-full bg-border" />
-        <span aria-hidden className="h-2 w-2 rounded-full bg-border" />
-        <span aria-hidden className="h-2 w-2 rounded-full bg-border" />
-        <span className="ml-2 text-[11px] uppercase tracking-wider text-fg-muted">
-          Site Analysis Preview
-        </span>
-      </div>
-      <div className="space-y-1.5 p-4 font-mono text-[12.5px] leading-relaxed text-fg-muted">
-        {TERMINAL_LINES.slice(0, visible).map((line, i) => {
-          if (line.kind === "ok") {
-            return (
-              <div key={i} className="flex items-center gap-2">
-                <span className="text-primary-container">{"✓"}</span>
-                <span>{line.text}</span>
-              </div>
-            );
-          }
-          if (line.kind === "warn") {
-            return (
-              <div key={i} className="flex items-center gap-2">
-                <span className="text-error">{"⚠"}</span>
-                <span>{line.text}</span>
-              </div>
-            );
-          }
-          return (
-            <div key={i} className="flex items-center gap-2 text-fg">
-              <LoaderCircle size={12} aria-hidden className="animate-spin" />
-              <span>{line.text}</span>
-              <span
-                aria-hidden
-                className="ml-1 inline-block h-3.5 w-1.5 animate-pulse bg-primary-container align-middle"
-              />
-            </div>
-          );
-        })}
-        <div className="mt-3 space-y-1.5">
-          <div
-            aria-hidden
-            className="h-2.5 w-3/4 animate-pulse rounded bg-surface-high/70"
-          />
-          <div
-            aria-hidden
-            className="h-2.5 w-1/2 animate-pulse rounded bg-surface-high/70"
-          />
-          <div
-            aria-hidden
-            className="h-2.5 w-5/6 animate-pulse rounded bg-surface-high/70"
-          />
-        </div>
-      </div>
-    </div>
   );
 }
 

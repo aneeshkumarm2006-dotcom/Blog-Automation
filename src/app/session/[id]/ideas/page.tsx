@@ -53,7 +53,7 @@ export default async function ApproveIdeasPage({ params }: PageProps) {
   const liveIdeas = ideas.filter((i) => !i.deleted).map(toClientIdea);
 
   return (
-    <AppShell width="wide" footerSlot={<span>Personal use only</span>}>
+    <AppShell width="wide">
       <IdeaList
         sessionId={id}
         initialSession={toClientSession(session)}

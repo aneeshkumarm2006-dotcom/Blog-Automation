@@ -50,7 +50,7 @@ export default async function GeneratingPage({ params }: PageProps) {
   const [blogs, ideas] = await Promise.all([listBlogs(id), listIdeas(id)]);
 
   return (
-    <AppShell width="wide" footerSlot={<span>Personal use only</span>}>
+    <AppShell width="wide">
       <BlogProgress
         sessionId={id}
         initialSession={toClientSession(session)}

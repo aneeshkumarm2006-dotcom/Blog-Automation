@@ -41,12 +41,6 @@ export default async function LoginPage({
         <div className="p-8">
           <LoginForm redirectTo={redirectTo} />
         </div>
-
-        <div className="border-t border-border bg-bg p-4 text-center">
-          <p className="text-xs font-medium uppercase tracking-wider text-fg-muted">
-            Personal use only.
-          </p>
-        </div>
       </div>
     </div>
   );

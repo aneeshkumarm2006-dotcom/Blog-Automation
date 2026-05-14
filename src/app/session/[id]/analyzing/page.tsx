@@ -42,7 +42,7 @@ export default async function AnalyzingPage({ params }: PageProps) {
   }
 
   return (
-    <AppShell width="wide" footerSlot={<span>Personal use only</span>}>
+    <AppShell width="wide" >
       <AnalyzingClient
         sessionId={id}
         initialSession={toClientSession(session)}

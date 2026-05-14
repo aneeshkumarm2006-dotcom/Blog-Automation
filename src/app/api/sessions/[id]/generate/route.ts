@@ -21,11 +21,29 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 interface MessageLike {
-  content?: Array<{ type: string; text?: string }>;
+  content?: Array<{
+    type: string;
+    text?: string;
+    name?: string;
+    input?: unknown;
+  }>;
 }
 
-function extractText(message: MessageLike): string {
+// Prefer the structured tool-call output. Claude is instructed to return the
+// blog as a `submit_blog_post` tool call so the post can't be polluted with
+// pre-amble thinking ("Now I have enough data...") or trailing self-check
+// tables. If no tool_use block is present we fall back to text extraction so a
+// misbehaving response still produces *something* the user can inspect.
+function extractBlogContent(message: MessageLike): string {
   const blocks = message.content ?? [];
+  for (const b of blocks) {
+    if (b.type === "tool_use" && b.name === "submit_blog_post") {
+      const input = b.input as { content?: unknown } | undefined;
+      if (input && typeof input.content === "string") {
+        return input.content.trim();
+      }
+    }
+  }
   const texts = blocks
     .filter((b) => b.type === "text" && typeof b.text === "string")
     .map((b) => b.text as string);
@@ -97,7 +115,7 @@ function buildUserPrompt(idea: Idea, session: Session): string {
     `siteContext:`,
     siteContext,
     ``,
-    `Return only the Markdown document. Start with the YAML frontmatter and end with the final line of the Sources section.`,
+    `When you have gathered the statistics you need, return your final answer by calling the submit_blog_post tool with the complete Markdown in the content parameter. Do not emit free-text commentary; the tool call is the only output that will be kept.`,
   ].join("\n");
 }
 
@@ -107,7 +125,25 @@ async function generateOneBlog(idea: Idea, session: Session): Promise<string> {
     model: ANTHROPIC_MODEL,
     max_tokens: 16000,
     system: BLOG_WRITER_SYSTEM_PROMPT,
-    tools: [{ type: "web_search_20260209", name: "web_search" }],
+    tools: [
+      { type: "web_search_20260209", name: "web_search" },
+      {
+        name: "submit_blog_post",
+        description:
+          "Submit the final blog post. Call this exactly once when the post is complete. The content parameter must be the full Markdown document starting with the YAML frontmatter `---` and ending with the last line of the Sources section. Do not include any pre-amble, post-amble, self-check tables, or commentary in the content.",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            content: {
+              type: "string",
+              description:
+                "Complete Markdown document. First non-empty line MUST be `---` (start of YAML frontmatter). Last non-empty line MUST be the final Sources bullet.",
+            },
+          },
+          required: ["content"],
+        },
+      },
+    ],
     messages: [
       {
         role: "user",
@@ -117,7 +153,7 @@ async function generateOneBlog(idea: Idea, session: Session): Promise<string> {
   });
 
   const final = await stream.finalMessage();
-  const text = extractText(final as MessageLike);
+  const text = extractBlogContent(final as MessageLike);
   const stripped = stripCodeFence(text);
   if (!stripped) {
     throw new Error("Blog writer returned empty content");

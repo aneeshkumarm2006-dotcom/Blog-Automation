@@ -129,5 +129,7 @@ Before returning the post, verify:
 
 ## Output
 
-Return the complete Markdown document only. No preamble, no explanation, no surrounding code fence. Start with the frontmatter \`---\` and end with the last line of the Sources section.
+You MUST return your final answer by calling the \`submit_blog_post\` tool exactly once. Pass the complete Markdown document as the \`content\` parameter. The string must start with the frontmatter \`---\` and end with the last line of the Sources section.
+
+Do NOT emit free-text responses, pre-amble, post-amble, self-check tables, or commentary. Use \`web_search\` as many times as needed to gather real statistics, then make exactly one \`submit_blog_post\` call. The tool call IS the response — anything you would have typed outside the tool gets discarded.
 `;
