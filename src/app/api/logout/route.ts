@@ -1,7 +1,23 @@
 // runtime = "nodejs" — Edge runtime is unsupported (Anthropic SDK + MongoDB driver require Node).
-// Stub: real implementation lands in Stage 3 (password gate + auth middleware).
+import { serialize } from "cookie";
+import { SESSION_COOKIE } from "@/lib/auth";
+
 export const runtime = "nodejs";
 
 export async function POST() {
-  return new Response("Not implemented", { status: 501 });
+  const cookieHeader = serialize(SESSION_COOKIE, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+    secure: process.env.NODE_ENV === "production",
+  });
+
+  return new Response(JSON.stringify({ ok: true }), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json",
+      "Set-Cookie": cookieHeader,
+    },
+  });
 }
