@@ -1,9 +1,17 @@
 // runtime = "nodejs" — Edge runtime is unsupported (MongoDB driver + archiver require Node).
 import { Readable } from "node:stream";
 import { ObjectId } from "mongodb";
-import archiver from "archiver";
+import * as archiverPkg from "archiver";
+import type { Archiver, ArchiverOptions } from "archiver";
 import { getSession, listBlogs, listIdeas } from "@/lib/db";
 import { slugifyBlog } from "@/lib/slugify";
+
+// archiver v8 is pure ESM with named exports (no default). @types/archiver v7
+// still ships the legacy `export = archiver` factory shape, so we re-derive the
+// ZipArchive constructor type locally.
+const { ZipArchive } = archiverPkg as unknown as {
+  ZipArchive: new (options?: ArchiverOptions) => Archiver;
+};
 
 export const runtime = "nodejs";
 
@@ -52,7 +60,7 @@ export async function GET(
     }
   }
 
-  const archive = archiver("zip", { zlib: { level: 9 } });
+  const archive = new ZipArchive({ zlib: { level: 9 } });
   for (const entry of entries) {
     archive.append(entry.content, { name: `${entry.slug}.md` });
   }
