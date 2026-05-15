@@ -11,10 +11,10 @@ import type {
   Idea,
   IdeaDTO,
   KeywordPair,
+  Project,
   Session,
   SessionDTO,
   SessionStatus,
-  SiteAnalysis,
 } from "@/types";
 
 let indexesEnsured: Promise<void> | null = null;
@@ -42,7 +42,12 @@ export async function ensureIndexes(): Promise<void> {
     indexesEnsured = (async () => {
       const db = await getDb();
       await Promise.all([
+        db.collection<Project>("projects").createIndex({ createdAt: -1 }),
+        db.collection<Project>("projects").createIndex({ websiteUrl: 1 }),
         db.collection<Session>("sessions").createIndex({ createdAt: -1 }),
+        db
+          .collection<Session>("sessions")
+          .createIndex({ projectId: 1, createdAt: -1 }),
         db.collection<Idea>("ideas").createIndex({ sessionId: 1 }),
         db.collection<Blog>("blogs").createIndex({ sessionId: 1 }),
       ]);
@@ -59,7 +64,8 @@ export function toObjectId(id: string | ObjectId): ObjectId {
 }
 
 export interface CreateSessionInput {
-  websiteUrl: string;
+  projectId: string | ObjectId;
+  name: string;
   keywordPairs: KeywordPair[];
   blogCount: number;
   wordCount: number;
@@ -69,19 +75,22 @@ export async function createSession(
   input: CreateSessionInput,
 ): Promise<Session> {
   const doc: Omit<Session, "_id"> = {
+    projectId: toObjectId(input.projectId),
+    name: input.name,
     createdAt: new Date(),
-    websiteUrl: input.websiteUrl,
     keywordPairs: input.keywordPairs,
     blogCount: input.blogCount,
     wordCount: input.wordCount,
-    status: "created",
+    status: "ideas_pending",
   };
   const col = await sessions();
   const result = await col.insertOne(doc as Session);
   return { _id: result.insertedId, ...doc };
 }
 
-export async function getSession(id: string | ObjectId): Promise<Session | null> {
+export async function getSession(
+  id: string | ObjectId,
+): Promise<Session | null> {
   const col = await sessions();
   return col.findOne({ _id: toObjectId(id) } as Filter<Session>);
 }
@@ -91,8 +100,32 @@ export async function listSessions(): Promise<Session[]> {
   return col.find({}).sort({ createdAt: -1 }).toArray();
 }
 
+export async function listSessionsByProject(
+  projectId: string | ObjectId,
+): Promise<Session[]> {
+  const col = await sessions();
+  return col
+    .find({ projectId: toObjectId(projectId) } as Filter<Session>)
+    .sort({ createdAt: -1 })
+    .toArray();
+}
+
+export async function deleteSessionsByProject(
+  projectId: string | ObjectId,
+): Promise<ObjectId[]> {
+  const col = await sessions();
+  const found = await col
+    .find({ projectId: toObjectId(projectId) } as Filter<Session>, {
+      projection: { _id: 1 },
+    })
+    .toArray();
+  if (found.length === 0) return [];
+  const ids = found.map((s) => s._id);
+  await col.deleteMany({ _id: { $in: ids } } as Filter<Session>);
+  return ids;
+}
+
 export interface UpdateSessionExtra {
-  siteAnalysis?: SiteAnalysis;
   failureReason?: string;
 }
 
@@ -102,7 +135,6 @@ export async function updateSessionStatus(
   extra: UpdateSessionExtra = {},
 ): Promise<void> {
   const set: Partial<Session> = { status };
-  if (extra.siteAnalysis !== undefined) set.siteAnalysis = extra.siteAnalysis;
   if (extra.failureReason !== undefined)
     set.failureReason = extra.failureReason;
 
@@ -113,6 +145,19 @@ export async function updateSessionStatus(
 
   const col = await sessions();
   await col.updateOne({ _id: toObjectId(id) } as Filter<Session>, update);
+}
+
+export async function renameSession(
+  id: string | ObjectId,
+  name: string,
+): Promise<Session | null> {
+  const col = await sessions();
+  const result = await col.findOneAndUpdate(
+    { _id: toObjectId(id) } as Filter<Session>,
+    { $set: { name } } as UpdateFilter<Session>,
+    { returnDocument: "after" },
+  );
+  return result;
 }
 
 export type NewIdea = Omit<Idea, "_id" | "sessionId"> & {
@@ -166,6 +211,16 @@ export async function deleteIdea(ideaId: string | ObjectId): Promise<void> {
   );
 }
 
+export async function deleteIdeasBySessions(
+  sessionIds: ObjectId[],
+): Promise<void> {
+  if (sessionIds.length === 0) return;
+  const col = await ideas();
+  await col.deleteMany({
+    sessionId: { $in: sessionIds },
+  } as Filter<Idea>);
+}
+
 export type BlogUpsert = Partial<Omit<Blog, "_id" | "sessionId" | "ideaId">> & {
   sessionId: string | ObjectId;
   ideaId: string | ObjectId;
@@ -209,11 +264,34 @@ export async function getBlog(
   return col.findOne({ _id: toObjectId(blogId) } as Filter<Blog>);
 }
 
+export async function renameBlog(
+  blogId: string | ObjectId,
+  name: string,
+): Promise<Blog | null> {
+  const col = await blogs();
+  const result = await col.findOneAndUpdate(
+    { _id: toObjectId(blogId) } as Filter<Blog>,
+    { $set: { name } } as UpdateFilter<Blog>,
+    { returnDocument: "after" },
+  );
+  return result;
+}
+
+export async function deleteBlogsBySessions(
+  sessionIds: ObjectId[],
+): Promise<void> {
+  if (sessionIds.length === 0) return;
+  const col = await blogs();
+  await col.deleteMany({
+    sessionId: { $in: sessionIds },
+  } as Filter<Blog>);
+}
+
 function isObjectId(v: unknown): v is ObjectId {
   return v instanceof ObjectId;
 }
 
-function serializeValue(v: unknown): unknown {
+export function serializeValue(v: unknown): unknown {
   if (v === null || v === undefined) return v;
   if (isObjectId(v)) return v.toHexString();
   if (v instanceof Date) return v.toISOString();

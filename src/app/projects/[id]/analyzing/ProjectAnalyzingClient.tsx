@@ -12,14 +12,13 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
-import type { SessionDTO, SessionStatus } from "@/types";
+import type { ProjectAnalysisStatus, ProjectDTO } from "@/types";
 
-interface AnalyzingClientProps {
-  sessionId: string;
-  initialSession: SessionDTO;
+interface ProjectAnalyzingClientProps {
+  projectId: string;
+  initialProject: ProjectDTO;
 }
 
-// Copy mirrors the Stitch screen (id 59e778cff8ee499183a18371d17b4b15).
 const STEPS = [
   {
     title: "Crawling URLs",
@@ -35,7 +34,7 @@ const STEPS = [
   },
 ] as const;
 
-const POLL_INTERVAL_MS = 2000;
+const POLL_INTERVAL_MS = 5000;
 const STEP_ADVANCE_MS = 9000;
 
 type StepState = "done" | "active" | "pending";
@@ -46,16 +45,16 @@ function getStepState(stepIndex: number, activeIndex: number): StepState {
   return "pending";
 }
 
-export function AnalyzingClient({
-  sessionId,
-  initialSession,
-}: AnalyzingClientProps) {
+export function ProjectAnalyzingClient({
+  projectId,
+  initialProject,
+}: ProjectAnalyzingClientProps) {
   const router = useRouter();
-  const [status, setStatus] = React.useState<SessionStatus>(
-    initialSession.status,
+  const [status, setStatus] = React.useState<ProjectAnalysisStatus>(
+    initialProject.analysisStatus,
   );
   const [failureReason, setFailureReason] = React.useState<string | undefined>(
-    initialSession.failureReason,
+    initialProject.failureReason,
   );
   const [activeStep, setActiveStep] = React.useState(0);
   const [retryNonce, setRetryNonce] = React.useState(0);
@@ -64,12 +63,16 @@ export function AnalyzingClient({
   // 1) Kick off the analyze request once per mount / retry.
   React.useEffect(() => {
     if (kickedOff.current) return;
-    if (status !== "created" && status !== "analyzing" && status !== "failed") {
+    if (
+      status !== "pending" &&
+      status !== "analyzing" &&
+      status !== "failed"
+    ) {
       return;
     }
     kickedOff.current = true;
 
-    fetch(`/api/sessions/${sessionId}/analyze`, { method: "POST" })
+    fetch(`/api/projects/${projectId}/analyze`, { method: "POST" })
       .then(async (res) => {
         if (!res.ok) {
           const body = (await res.json().catch(() => ({}))) as {
@@ -83,59 +86,54 @@ export function AnalyzingClient({
         setFailureReason(err instanceof Error ? err.message : "Network error");
         setStatus("failed");
       });
-  }, [sessionId, status, retryNonce]);
+  }, [projectId, status, retryNonce]);
 
-  // 2) Poll the session every 2s while in-progress.
+  // 2) Poll the project every 2s while analysis is in flight.
   React.useEffect(() => {
-    if (status !== "created" && status !== "analyzing") return;
+    if (status !== "pending" && status !== "analyzing") return;
 
     let cancelled = false;
     const tick = async () => {
       try {
-        const res = await fetch(`/api/sessions/${sessionId}`, {
+        const res = await fetch(`/api/projects/${projectId}`, {
           cache: "no-store",
         });
         if (!res.ok) return;
-        const body = (await res.json()) as { session?: SessionDTO };
-        if (cancelled || !body.session) return;
-        setStatus(body.session.status);
-        setFailureReason(body.session.failureReason);
+        const body = (await res.json()) as { project?: ProjectDTO };
+        if (cancelled || !body.project) return;
+        setStatus(body.project.analysisStatus);
+        setFailureReason(body.project.failureReason);
       } catch {
         // Swallow transient errors and rely on the next tick.
       }
     };
     const handle = window.setInterval(tick, POLL_INTERVAL_MS);
-    // Fire one immediate poll so a flipped status isn't gated by the interval.
     void tick();
     return () => {
       cancelled = true;
       window.clearInterval(handle);
     };
-  }, [sessionId, status]);
+  }, [projectId, status]);
 
   // 3) Cycle the visual stepper while in-progress.
   React.useEffect(() => {
-    if (status !== "created" && status !== "analyzing") return;
+    if (status !== "pending" && status !== "analyzing") return;
     const handle = window.setInterval(() => {
       setActiveStep((idx) => Math.min(idx + 1, STEPS.length - 1));
     }, STEP_ADVANCE_MS);
     return () => window.clearInterval(handle);
   }, [status]);
 
-  // 4) Redirect once the status moves on.
+  // 4) Redirect once analysis lands.
   React.useEffect(() => {
-    if (status === "ideas_pending" || status === "ideas_approved") {
-      router.replace(`/session/${sessionId}/ideas`);
-    } else if (status === "generating" || status === "humanizing") {
-      router.replace(`/session/${sessionId}/generating`);
-    } else if (status === "done") {
-      router.replace(`/session/${sessionId}/export`);
+    if (status === "complete") {
+      router.replace(`/projects/${projectId}`);
     }
-  }, [router, sessionId, status]);
+  }, [router, projectId, status]);
 
   const handleRetry = React.useCallback(() => {
     kickedOff.current = false;
-    setStatus("created");
+    setStatus("pending");
     setActiveStep(0);
     setFailureReason(undefined);
     setRetryNonce((n) => n + 1);
@@ -153,8 +151,8 @@ export function AnalyzingClient({
           </h1>
           <p className="mt-1 max-w-sm text-sm text-fg-muted">
             {isFailed
-              ? "We couldn’t finish the analysis. Try again, or revisit the inputs in History."
-              : `BlogForge is reading ${initialSession.websiteUrl} to brief the blog ideas.`}
+              ? "We couldn't finish the analysis. Try again, or revisit the project list."
+              : `Blog Automation is reading ${initialProject.websiteUrl} to brief your blog ideas.`}
           </p>
         </header>
 
@@ -166,14 +164,14 @@ export function AnalyzingClient({
 
         <footer className="mt-6 flex items-center justify-between gap-3">
           <p className="text-xs text-fg-muted">
-            {isFailed
-              ? "Retry to re-run web search and rebuild the brief."
-              : (
-                <>
-                  This usually takes{" "}
-                  <span className="font-medium text-fg">2–3 min</span>
-                </>
-              )}
+            {isFailed ? (
+              "Retry to re-run web search and rebuild the brief."
+            ) : (
+              <>
+                This usually takes{" "}
+                <span className="font-medium text-fg">2–3 min</span>
+              </>
+            )}
           </p>
           {isFailed ? (
             <Button onClick={handleRetry} size="sm">
@@ -220,7 +218,10 @@ function IconBadge({ failed }: { failed: boolean }) {
 
 function Stepper({ activeStep }: { activeStep: number }) {
   return (
-    <ol className="mx-auto mb-6 flex w-full max-w-sm flex-col" aria-live="polite">
+    <ol
+      className="mx-auto mb-6 flex w-full max-w-sm flex-col"
+      aria-live="polite"
+    >
       {STEPS.map((step, idx) => {
         const state = getStepState(idx, activeStep);
         const isLast = idx === STEPS.length - 1;
@@ -248,8 +249,7 @@ function Stepper({ activeStep }: { activeStep: number }) {
                   "border-primary-container/60 bg-surface text-primary-container",
                 state === "active" &&
                   "border-fg/40 bg-surface text-fg",
-                state === "pending" &&
-                  "border-border bg-surface text-outline",
+                state === "pending" && "border-border bg-surface text-outline",
               )}
             >
               {state === "done" ? (

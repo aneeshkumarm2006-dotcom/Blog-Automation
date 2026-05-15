@@ -13,13 +13,15 @@ import {
   Trash2,
   TriangleAlert,
 } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
-import type { IdeaDTO, SessionDTO } from "@/types";
+import type { IdeaDTO, ProjectDTO, SessionDTO } from "@/types";
 
 interface IdeaListProps {
   sessionId: string;
   initialSession: SessionDTO;
+  initialProject: ProjectDTO;
   initialIdeas: IdeaDTO[];
 }
 
@@ -36,6 +38,7 @@ const INTENT_LABELS: Record<string, string> = {
 export function IdeaList({
   sessionId,
   initialSession,
+  initialProject,
   initialIdeas,
 }: IdeaListProps) {
   const router = useRouter();
@@ -240,38 +243,34 @@ export function IdeaList({
     }
   }, [router, sessionId]);
 
-  const everyIdeaHasValidPair = ideas.every((idea) =>
-    initialSession.keywordPairs.some(
-      (p) =>
-        p.keyword === idea.assignedKeyword &&
-        p.backlink === idea.assignedBacklink,
-    ),
-  );
   const canApprove =
-    ideas.length > 0 &&
-    everyIdeaHasValidPair &&
-    !approving &&
-    !generating &&
-    !regenerating;
+    ideas.length > 0 && !approving && !generating && !regenerating;
 
   return (
     <div className="flex flex-col">
       <header className="mb-8">
+        <Link
+          href={`/projects/${initialProject._id}`}
+          className="mb-3 inline-flex items-center gap-2 text-xs text-fg-muted hover:text-fg"
+        >
+          ← {initialProject.name}
+        </Link>
         <p className="text-xs uppercase tracking-wider text-fg-muted">
-          Step 2 of 3
+          Step 2 of 3 · {initialSession.name}
         </p>
         <h1 className="mt-1 font-serif text-3xl font-semibold text-fg">
           Review &amp; Approve Blog Ideas
         </h1>
         <p className="mt-2 text-sm text-fg-muted">
           Targeting{" "}
-          <span className="text-fg">{initialSession.websiteUrl}</span>. Edit
-          titles, swap keyword assignments, or delete any idea before kicking
-          off the writers.
+          <span className="text-fg">{initialProject.websiteUrl}</span>. Edit
+          titles and angles, or delete any idea before kicking off the writers.
+          Every blog includes all {initialSession.keywordPairs.length} of your
+          keywords.
         </p>
       </header>
 
-      <AnalysisSnapshot session={initialSession} />
+      <AnalysisSnapshot project={initialProject} />
 
       {error ? (
         <div
@@ -300,7 +299,6 @@ export function IdeaList({
             <IdeaRow
               key={idea._id}
               idea={idea}
-              keywordPairs={initialSession.keywordPairs}
               selected={selected.has(idea._id)}
               expanded={expanded.has(idea._id)}
               onToggleSelected={() => toggleSelected(idea._id)}
@@ -350,9 +348,9 @@ export function IdeaList({
   );
 }
 
-function AnalysisSnapshot({ session }: { session: SessionDTO }) {
+function AnalysisSnapshot({ project }: { project: ProjectDTO }) {
   const [open, setOpen] = React.useState(false);
-  const analysis = session.siteAnalysis;
+  const analysis = project.siteAnalysis;
   if (!analysis) return null;
 
   const gaps = analysis.content_gaps?.filter(Boolean) ?? [];
@@ -426,7 +424,6 @@ function AnalysisSnapshot({ session }: { session: SessionDTO }) {
 
 interface IdeaRowProps {
   idea: IdeaDTO;
-  keywordPairs: SessionDTO["keywordPairs"];
   selected: boolean;
   expanded: boolean;
   onToggleSelected: () => void;
@@ -437,7 +434,6 @@ interface IdeaRowProps {
 
 function IdeaRow({
   idea,
-  keywordPairs,
   selected,
   expanded,
   onToggleSelected,
@@ -455,8 +451,6 @@ function IdeaRow({
 
   const intentLabel =
     INTENT_LABELS[idea.searchIntent?.toLowerCase()] ?? idea.searchIntent;
-
-  const pairValue = `${idea.assignedKeyword}::${idea.assignedBacklink}`;
 
   return (
     <li className="group rounded-lg border border-border bg-surface transition-colors hover:border-primary-container/60">
@@ -495,43 +489,11 @@ function IdeaRow({
           />
 
           <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={pairValue}
-              onChange={(e) => {
-                const [keyword, ...rest] = e.target.value.split("::");
-                const backlink = rest.join("::");
-                if (!keyword || !backlink) return;
-                onPatch({
-                  assignedKeyword: keyword,
-                  assignedBacklink: backlink,
-                });
-              }}
-              className={cn(
-                "h-7 max-w-full rounded-sm border border-border bg-surface-high px-2 text-xs text-fg-muted",
-                "focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary",
-              )}
-              aria-label="Assigned keyword"
-            >
-              {keywordPairs.map((p) => {
-                const value = `${p.keyword}::${p.backlink}`;
-                return (
-                  <option key={value} value={value}>
-                    {p.keyword}
-                  </option>
-                );
-              })}
-            </select>
             <span
               className="rounded-sm border border-border bg-surface-high px-2 py-0.5 text-xs text-fg-muted"
               title={`Search intent: ${intentLabel}`}
             >
               {intentLabel}
-            </span>
-            <span
-              className="max-w-[18rem] truncate rounded-sm border border-border bg-surface-high px-2 py-0.5 text-xs text-fg-muted"
-              title={idea.assignedBacklink}
-            >
-              {hostOf(idea.assignedBacklink)}
             </span>
             <button
               type="button"
@@ -598,14 +560,6 @@ function IdeaRow({
       </div>
     </li>
   );
-}
-
-function hostOf(url: string): string {
-  try {
-    return new URL(url).host.replace(/^www\./, "");
-  } catch {
-    return url;
-  }
 }
 
 function GeneratingPlaceholder({ count }: { count: number }) {

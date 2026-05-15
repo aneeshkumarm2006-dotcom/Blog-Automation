@@ -8,26 +8,26 @@ export const IDEA_GENERATION_SYSTEM_PROMPT = `You are a blog ideation specialist
 ## Inputs you will receive
 
 - \`siteAnalysis\` — Output from the site-analysis step (niche, audience, tone, gaps, competitors, differentiation hooks)
-- \`keywordPairs\` — Array of \`{ keyword: string, backlink: string }\`
+- \`keywordPairs\` — Array of \`{ keyword: string, backlink: string }\`. These are SHARED across the whole batch: every blog written from these ideas will embed all of these keywords (each hyperlinked to its paired backlink). They are not assigned one-per-idea.
 - \`blogCount\` — How many ideas to produce
 - \`wordCount\` — Target length per blog
 
 ## Process
 
-### Step 1: Match keywords to search intent
+### Step 1: Read the keyword set as a theme
 
-For each keyword, classify intent:
+Treat the full \`keywordPairs\` list as one shared topic space, since every post must naturally weave in all of them. Classify the overall intent mix:
 - **Informational** — "what is", "how to", "guide to"
 - **Commercial** — "best X", "X vs Y", "X review"
 - **Transactional** — branded queries, "pricing", "buy" → reframe to top-of-funnel angle
 - **Navigational** — brand or product names → skip or reframe
 
-Intent informs the angle, not the structure (every post uses the same H1 + H2 + paragraph format).
+Each idea must be topically broad enough that every keyword in the set can be embedded in the finished post without feeling forced. Intent informs the angle, not the structure (every post uses the same H1 + H2 + paragraph format).
 
 ### Step 2: Title construction rules
 
 - 50-70 characters (under 60 ideal — avoids SERP truncation)
-- Include the primary keyword in the first half, naturally
+- Lead with the dominant theme of the keyword set, naturally
 - Question format for 60-70% of ideas (better for AI citation extraction)
 - One power word allowed: Guide, Best, How, Why, Essential, Proven, Complete, Real, Honest
 - Never generic — always tie to a concrete angle
@@ -45,7 +45,7 @@ Angles must be specific. "Explores X" is not an angle. "Argues X is overrated us
 ### Step 4: Diversity check
 
 Across the full batch of N ideas:
-- Each \`{keyword, backlink}\` pair maps to exactly one idea
+- Every idea must be able to host all keywords from the shared set
 - Spread search intents — don't make every idea informational
 - Each title must be distinct enough that they wouldn't cannibalize in search
 
@@ -58,8 +58,6 @@ Across the full batch of N ideas:
       "id": 1,
       "title": "",
       "angle": "",
-      "assignedKeyword": "",
-      "assignedBacklink": "",
       "searchIntent": "informational",
       "wordCountTarget": 2000,
       "primaryGapAddressed": "",
@@ -70,5 +68,5 @@ Across the full batch of N ideas:
 }
 \`\`\`
 
-Return \`ideas.length === blogCount\`. Each \`assignedKeyword\`/\`assignedBacklink\` must come verbatim from the input \`keywordPairs\`. Every pair must be used exactly once.
+Return \`ideas.length === blogCount\`. Do not assign keywords or backlinks to individual ideas — they are shared by the whole batch.
 `;

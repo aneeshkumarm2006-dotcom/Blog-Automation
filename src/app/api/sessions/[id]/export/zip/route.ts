@@ -22,12 +22,12 @@ export async function GET(
   const { id } = await ctx.params;
 
   if (!ObjectId.isValid(id)) {
-    return Response.json({ error: "Invalid session id" }, { status: 400 });
+    return Response.json({ error: "Invalid batch id" }, { status: 400 });
   }
 
   const session = await getSession(id);
   if (!session) {
-    return Response.json({ error: "Session not found" }, { status: 404 });
+    return Response.json({ error: "Batch not found" }, { status: 404 });
   }
 
   const [blogs, ideas] = await Promise.all([listBlogs(id), listIdeas(id)]);
@@ -38,14 +38,17 @@ export async function GET(
       const content = blog.humanizedContent ?? blog.rawContent;
       if (!content) return null;
       const idea = ideaById.get(blog.ideaId.toHexString());
-      const slug = slugifyBlog(idea?.title, blog._id.toHexString());
+      const slug = slugifyBlog(
+        blog.name ?? idea?.title,
+        blog._id.toHexString(),
+      );
       return { slug, content };
     })
     .filter((e): e is { slug: string; content: string } => e !== null);
 
   if (entries.length === 0) {
     return Response.json(
-      { error: "No exportable blogs in this session" },
+      { error: "No exportable blogs in this batch" },
       { status: 409 },
     );
   }

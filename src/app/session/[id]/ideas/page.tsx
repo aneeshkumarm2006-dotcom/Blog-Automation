@@ -8,10 +8,11 @@ import {
   toClientIdea,
   toClientSession,
 } from "@/lib/db";
+import { getProject, toClientProject } from "@/lib/projects";
 import { IdeaList } from "./IdeaList";
 
 export const metadata: Metadata = {
-  title: "Approve Ideas — BlogForge",
+  title: "Approve Ideas — Blog Automation",
 };
 
 export const dynamic = "force-dynamic";
@@ -24,21 +25,21 @@ export default async function ApproveIdeasPage({ params }: PageProps) {
   const { id } = await params;
 
   if (!ObjectId.isValid(id)) {
-    redirect("/history");
+    redirect("/projects");
   }
 
   const session = await getSession(id);
   if (!session) {
-    redirect("/history");
+    redirect("/projects");
   }
 
-  // Route by session status: bounce back to the analyzing screen if the site
-  // analysis isn't done yet, or forward to generating/export if past approval.
+  const project = await getProject(session.projectId);
+  if (!project) {
+    redirect("/projects");
+  }
+
+  // Route by batch status: forward to generating/export if past approval.
   switch (session.status) {
-    case "created":
-    case "analyzing":
-    case "failed":
-      redirect(`/session/${id}/analyzing`);
     case "ideas_approved":
     case "generating":
     case "humanizing":
@@ -57,6 +58,7 @@ export default async function ApproveIdeasPage({ params }: PageProps) {
       <IdeaList
         sessionId={id}
         initialSession={toClientSession(session)}
+        initialProject={toClientProject(project)}
         initialIdeas={liveIdeas}
       />
     </AppShell>

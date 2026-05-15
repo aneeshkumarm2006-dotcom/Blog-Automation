@@ -17,7 +17,7 @@ const sourceSerif = Source_Serif_4({
 });
 
 export const metadata: Metadata = {
-  title: "BlogForge",
+  title: "Blog Automation",
   description: "SEO blog generation workspace",
 };
 
@@ -31,7 +31,9 @@ export default function RootLayout({
       lang="en"
       className={`${geist.variable} ${sourceSerif.variable} h-full antialiased`}
     >
-      <body className="min-h-full font-sans">{children}</body>
+      <body className="min-h-full font-sans" suppressHydrationWarning>
+        {children}
+      </body>
     </html>
   );
 }

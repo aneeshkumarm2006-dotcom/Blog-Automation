@@ -8,6 +8,7 @@ import {
   toClientIdea,
   type NewIdea,
 } from "@/lib/db";
+import { getProject } from "@/lib/projects";
 import { generateIdeasWithRetry } from "@/lib/ideas";
 import { regenerateIdeasSchema } from "@/lib/schemas";
 
@@ -21,15 +22,20 @@ export async function POST(
   const { id } = await ctx.params;
 
   if (!ObjectId.isValid(id)) {
-    return Response.json({ error: "Invalid session id" }, { status: 400 });
+    return Response.json({ error: "Invalid batch id" }, { status: 400 });
   }
 
   const session = await getSession(id);
   if (!session) {
-    return Response.json({ error: "Session not found" }, { status: 404 });
+    return Response.json({ error: "Batch not found" }, { status: 404 });
   }
 
-  if (!session.siteAnalysis) {
+  const project = await getProject(session.projectId);
+  if (!project) {
+    return Response.json({ error: "Parent project not found" }, { status: 404 });
+  }
+
+  if (!project.siteAnalysis) {
     return Response.json(
       { error: "Site analysis must complete before regenerating ideas" },
       { status: 409 },
@@ -73,17 +79,12 @@ export async function POST(
     );
   }
 
-  // Preserve the keyword/backlink pairs of the ideas we're replacing so the
-  // overall {keyword, backlink} → idea mapping stays one-to-one.
-  const keywordPairs = targets.map((t) => ({
-    keyword: t.assignedKeyword,
-    backlink: t.assignedBacklink,
-  }));
-
+  // Keyword pairs are shared across the whole batch, so regeneration only
+  // needs to produce `targets.length` fresh ideas using the session's pairs.
   try {
     const generated = await generateIdeasWithRetry({
-      siteAnalysis: session.siteAnalysis,
-      keywordPairs,
+      siteAnalysis: project.siteAnalysis,
+      keywordPairs: session.keywordPairs,
       blogCount: targets.length,
       wordCount: session.wordCount,
     });
@@ -96,8 +97,6 @@ export async function POST(
     const docs: NewIdea[] = generated.map((idea) => ({
       title: idea.title,
       angle: idea.angle,
-      assignedKeyword: idea.assignedKeyword,
-      assignedBacklink: idea.assignedBacklink,
       searchIntent: idea.searchIntent,
       wordCountTarget: idea.wordCountTarget,
       primaryGapAddressed: idea.primaryGapAddressed,

@@ -5,9 +5,10 @@ export interface KeywordPair {
   backlink: string;
 }
 
+// Site analysis now lives on Project, so a Batch (Session) starts at
+// `ideas_pending` (its first step is generating ideas using the project's
+// stored siteAnalysis).
 export type SessionStatus =
-  | "created"
-  | "analyzing"
   | "ideas_pending"
   | "ideas_approved"
   | "generating"
@@ -21,6 +22,12 @@ export type BlogStatus =
   | "raw"
   | "humanizing"
   | "humanized"
+  | "failed";
+
+export type ProjectAnalysisStatus =
+  | "pending"
+  | "analyzing"
+  | "complete"
   | "failed";
 
 // Matches the strict JSON schema in `context/skills/site-analysis.md`.
@@ -66,15 +73,29 @@ export interface SiteAnalysis {
   differentiation_hooks: string[] | null;
 }
 
+export interface Project {
+  _id: ObjectId;
+  name: string;
+  websiteUrl: string;
+  createdAt: Date;
+  updatedAt: Date;
+  analysisStatus: ProjectAnalysisStatus;
+  siteAnalysis?: SiteAnalysis;
+  analyzedAt?: Date;
+  failureReason?: string;
+}
+
+// "Batch" in product copy; persisted as the `sessions` collection for
+// migration simplicity.
 export interface Session {
   _id: ObjectId;
+  projectId: ObjectId;
+  name: string;
   createdAt: Date;
-  websiteUrl: string;
   keywordPairs: KeywordPair[];
   blogCount: number;
   wordCount: number;
   status: SessionStatus;
-  siteAnalysis?: SiteAnalysis;
   failureReason?: string;
 }
 
@@ -83,8 +104,6 @@ export interface Idea {
   sessionId: ObjectId;
   title: string;
   angle: string;
-  assignedKeyword: string;
-  assignedBacklink: string;
   searchIntent: string;
   wordCountTarget: number;
   primaryGapAddressed: string;
@@ -99,6 +118,7 @@ export interface Blog {
   sessionId: ObjectId;
   ideaId: ObjectId;
   status: BlogStatus;
+  name?: string;
   rawContent?: string;
   humanizedContent?: string;
   humanizationFailed?: boolean;
@@ -119,6 +139,7 @@ export type Serialized<T> = {
           : T[K];
 };
 
+export type ProjectDTO = Serialized<Project>;
 export type SessionDTO = Serialized<Session>;
 export type IdeaDTO = Serialized<Idea>;
 export type BlogDTO = Serialized<Blog>;

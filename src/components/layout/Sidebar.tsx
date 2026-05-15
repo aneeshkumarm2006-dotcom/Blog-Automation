@@ -2,13 +2,13 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { FilePlus, History, Sparkles, Menu, X } from "lucide-react";
+import { FilePlus, FolderKanban, Sparkles, Menu, X } from "lucide-react";
 import { SidebarItem } from "@/components/ui/SidebarItem";
 import { cn } from "@/lib/cn";
 
 const NAV = [
-  { href: "/session/new", label: "New Session", icon: <FilePlus size={16} /> },
-  { href: "/history", label: "History", icon: <History size={16} /> },
+  { href: "/projects", label: "Projects", icon: <FolderKanban size={16} /> },
+  { href: "/projects/new", label: "New Project", icon: <FilePlus size={16} /> },
 ];
 
 export interface SidebarProps {
@@ -53,7 +53,7 @@ export function Sidebar({ footerSlot }: SidebarProps) {
             <Sparkles size={16} />
           </span>
           <span className="font-serif text-base font-semibold text-fg md:hidden lg:inline">
-            BlogForge
+            Blog Automation
           </span>
         </div>
 

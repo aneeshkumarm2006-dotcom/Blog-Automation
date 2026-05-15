@@ -10,10 +10,11 @@ import {
   toClientIdea,
   toClientSession,
 } from "@/lib/db";
+import { getProject, toClientProject } from "@/lib/projects";
 import { BlogProgress } from "./BlogProgress";
 
 export const metadata: Metadata = {
-  title: "Generating Blogs — BlogForge",
+  title: "Generating Blogs — Blog Automation",
 };
 
 export const dynamic = "force-dynamic";
@@ -26,19 +27,21 @@ export default async function GeneratingPage({ params }: PageProps) {
   const { id } = await params;
 
   if (!ObjectId.isValid(id)) {
-    redirect("/history");
+    redirect("/projects");
   }
 
   const session = await getSession(id);
   if (!session) {
-    redirect("/history");
+    redirect("/projects");
   }
 
-  // Short-circuit if the session has moved off this stage in either direction.
+  const project = await getProject(session.projectId);
+  if (!project) {
+    redirect("/projects");
+  }
+
+  // Short-circuit if the batch has moved off this stage in either direction.
   switch (session.status) {
-    case "created":
-    case "analyzing":
-      redirect(`/session/${id}/analyzing`);
     case "ideas_pending":
       redirect(`/session/${id}/ideas`);
     case "done":
@@ -54,6 +57,7 @@ export default async function GeneratingPage({ params }: PageProps) {
       <BlogProgress
         sessionId={id}
         initialSession={toClientSession(session)}
+        initialProject={toClientProject(project)}
         initialBlogs={blogs.map(toClientBlog)}
         initialIdeas={ideas.filter((i) => !i.deleted).map(toClientIdea)}
       />

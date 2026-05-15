@@ -3,17 +3,17 @@ import { FilePen } from "lucide-react";
 import { LoginForm } from "./LoginForm";
 
 export const metadata: Metadata = {
-  title: "Login — BlogForge",
+  title: "Login — Blog Automation",
 };
 
 type LoginSearchParams = Promise<{ from?: string | string[] }>;
 
 function sanitizeRedirect(from: string | string[] | undefined): string {
   const value = Array.isArray(from) ? from[0] : from;
-  if (typeof value !== "string" || value.length === 0) return "/session/new";
-  if (!value.startsWith("/")) return "/session/new";
-  if (value.startsWith("//") || value.startsWith("/\\")) return "/session/new";
-  if (value === "/login" || value.startsWith("/login/")) return "/session/new";
+  if (typeof value !== "string" || value.length === 0) return "/projects";
+  if (!value.startsWith("/")) return "/projects";
+  if (value.startsWith("//") || value.startsWith("/\\")) return "/projects";
+  if (value === "/login" || value.startsWith("/login/")) return "/projects";
   return value;
 }
 
@@ -33,7 +33,7 @@ export default async function LoginPage({
             <FilePen className="h-6 w-6 text-fg" aria-hidden />
           </div>
           <h1 className="mb-2 font-serif text-2xl font-semibold text-fg">
-            BlogForge
+            Blog Automation
           </h1>
           <p className="text-sm text-fg-muted">SEO Engine Workspace</p>
         </div>

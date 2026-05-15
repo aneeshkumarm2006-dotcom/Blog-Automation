@@ -8,14 +8,11 @@ import {
   updateSessionStatus,
   upsertBlog,
 } from "@/lib/db";
+import { getProject } from "@/lib/projects";
 import { ANTHROPIC_MODEL, getAnthropicClient } from "@/lib/anthropic";
 import { BLOG_WRITER_SYSTEM_PROMPT } from "@/lib/prompts/blog-writer";
 import { humanize, HumanizationError } from "@/lib/zerogpt";
-import type {
-  Idea,
-  Session,
-  SiteAnalysis,
-} from "@/types";
+import type { Idea, Session, SiteAnalysis } from "@/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -101,16 +98,24 @@ function condenseSiteContext(analysis: SiteAnalysis | undefined): string {
   return lines.join("\n");
 }
 
-function buildUserPrompt(idea: Idea, session: Session): string {
-  const siteContext = condenseSiteContext(session.siteAnalysis);
+function buildUserPrompt(
+  idea: Idea,
+  session: Session,
+  siteAnalysis: SiteAnalysis | undefined,
+): string {
+  const siteContext = condenseSiteContext(siteAnalysis);
+  const keywordPairsBlock = session.keywordPairs
+    .map((p) => `- "${p.keyword}" -> ${p.backlink}`)
+    .join("\n");
   return [
     `Write a complete Markdown blog post for the inputs below.`,
     ``,
     `title: ${idea.title}`,
     `angle: ${idea.angle}`,
     `wordCount: ${idea.wordCountTarget}`,
-    `keyword: ${idea.assignedKeyword}`,
-    `backlink: ${idea.assignedBacklink}`,
+    ``,
+    `keywordPairs (embed EVERY keyword naturally; hyperlink each keyword's anchor text to its paired URL at least once, spread across the post):`,
+    keywordPairsBlock,
     ``,
     `siteContext:`,
     siteContext,
@@ -119,7 +124,11 @@ function buildUserPrompt(idea: Idea, session: Session): string {
   ].join("\n");
 }
 
-async function generateOneBlog(idea: Idea, session: Session): Promise<string> {
+async function generateOneBlog(
+  idea: Idea,
+  session: Session,
+  siteAnalysis: SiteAnalysis | undefined,
+): Promise<string> {
   const client = getAnthropicClient();
   const stream = client.messages.stream({
     model: ANTHROPIC_MODEL,
@@ -147,7 +156,7 @@ async function generateOneBlog(idea: Idea, session: Session): Promise<string> {
     messages: [
       {
         role: "user",
-        content: buildUserPrompt(idea, session),
+        content: buildUserPrompt(idea, session, siteAnalysis),
       },
     ],
   });
@@ -164,6 +173,7 @@ async function generateOneBlog(idea: Idea, session: Session): Promise<string> {
 async function runOneIdea(
   idea: Idea,
   session: Session,
+  siteAnalysis: SiteAnalysis | undefined,
   opts: { humanizationEnabled: boolean },
 ): Promise<void> {
   const sessionId = session._id;
@@ -179,7 +189,7 @@ async function runOneIdea(
 
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      rawContent = await generateOneBlog(idea, session);
+      rawContent = await generateOneBlog(idea, session, siteAnalysis);
       break;
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
@@ -260,15 +270,20 @@ export async function POST(
   const { id } = await ctx.params;
 
   if (!ObjectId.isValid(id)) {
-    return Response.json({ error: "Invalid session id" }, { status: 400 });
+    return Response.json({ error: "Invalid batch id" }, { status: 400 });
   }
 
   const session = await getSession(id);
   if (!session) {
-    return Response.json({ error: "Session not found" }, { status: 404 });
+    return Response.json({ error: "Batch not found" }, { status: 404 });
   }
 
-  // Idempotency: only kick off when the session is sitting at ideas_approved
+  const project = await getProject(session.projectId);
+  if (!project) {
+    return Response.json({ error: "Parent project not found" }, { status: 404 });
+  }
+
+  // Idempotency: only kick off when the batch is sitting at ideas_approved
   // or is recovering from a prior failure. If it's already running or done,
   // return current state and let the client keep polling /blogs.
   if (
@@ -279,7 +294,7 @@ export async function POST(
   ) {
     return Response.json(
       {
-        error: `Session is not ready to generate (status="${session.status}")`,
+        error: `Batch is not ready to generate (status="${session.status}")`,
       },
       { status: 409 },
     );
@@ -305,7 +320,7 @@ export async function POST(
 
   const humanizationEnabled = Boolean(process.env.ZEROGPT_API_KEY);
   if (!humanizationEnabled) {
-    // Soft warning: missing key is not a session failure. Per-blog
+    // Soft warning: missing key is not a batch failure. Per-blog
     // amber badges on the export screen will tell the user humanization
     // was skipped; the server log captures the config issue for ops.
     console.warn(
@@ -334,7 +349,9 @@ export async function POST(
   // Run the loop serially. Per PDR, no queue in v1 — one blog at a time.
   for (const idea of liveIdeas) {
     try {
-      await runOneIdea(idea, session, { humanizationEnabled });
+      await runOneIdea(idea, session, project.siteAnalysis, {
+        humanizationEnabled,
+      });
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       await upsertBlog({

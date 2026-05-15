@@ -49,9 +49,24 @@ export const keywordPairSchema = z.object({
 });
 export type KeywordPairInput = z.infer<typeof keywordPairSchema>;
 
-export const newSessionSchema = z
+export const newProjectSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Project name is required")
+    .max(120, "Project name must be at most 120 characters"),
+  websiteUrl: z.string().trim().url("Website URL must be a valid URL"),
+});
+export type NewProjectInput = z.infer<typeof newProjectSchema>;
+
+// Batch (a single generation run inside a Project).
+export const newBatchSchema = z
   .object({
-    websiteUrl: z.string().trim().url("Website URL must be a valid URL"),
+    name: z
+      .string()
+      .trim()
+      .min(1, "Batch name is required")
+      .max(120, "Batch name must be at most 120 characters"),
     keywordPairs: z
       .array(keywordPairSchema)
       .min(1, "At least one keyword pair is required")
@@ -60,7 +75,7 @@ export const newSessionSchema = z
       .number()
       .int("Blog count must be a whole number")
       .min(1, "Blog count must be at least 1")
-      .max(20, "Blog count must be at most 20"),
+      .max(50, "Blog count must be at most 50"),
     wordCount: z
       .number()
       .int("Word count must be a whole number")
@@ -70,15 +85,17 @@ export const newSessionSchema = z
         (n) => (n - 500) % 250 === 0,
         "Word count must be a multiple of 250 between 500 and 4000",
       ),
-  })
-  .refine(
-    (input) => input.blogCount === input.keywordPairs.length,
-    {
-      message: "Blog count must equal the number of keyword pairs",
-      path: ["blogCount"],
-    },
-  );
-export type NewSessionInput = z.infer<typeof newSessionSchema>;
+  });
+export type NewBatchInput = z.infer<typeof newBatchSchema>;
+
+export const renameSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Name is required")
+    .max(160, "Name must be at most 160 characters"),
+});
+export type RenameInput = z.infer<typeof renameSchema>;
 
 // Matches the strict JSON schema in `context/skills/idea-generation.md`.
 // The model returns string-typed `searchIntent`; downstream code is responsible
@@ -87,8 +104,6 @@ export const ideaItemSchema = z.object({
   id: z.number().int().optional(),
   title: z.string().trim().min(1),
   angle: z.string().trim().min(1),
-  assignedKeyword: z.string().trim().min(1),
-  assignedBacklink: z.string().trim().url(),
   searchIntent: z.string().trim().min(1),
   wordCountTarget: z.number().int().min(100),
   primaryGapAddressed: z.string(),
@@ -102,28 +117,15 @@ export const ideasResponseSchema = z.object({
 });
 export type IdeasResponse = z.infer<typeof ideasResponseSchema>;
 
-// PATCH body for editing a single idea. All fields are optional. The route
-// enforces that keyword/backlink reassignment maps to an existing
-// `keywordPairs` entry on the parent session.
+// PATCH body for editing a single idea. All fields are optional.
 export const ideaPatchSchema = z
   .object({
     title: z.string().trim().min(1).max(200).optional(),
     angle: z.string().trim().min(1).max(2000).optional(),
-    assignedKeyword: z.string().trim().min(1).max(120).optional(),
-    assignedBacklink: z.string().trim().url().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, {
     message: "At least one field is required",
-  })
-  .refine(
-    (v) =>
-      (v.assignedKeyword === undefined) ===
-      (v.assignedBacklink === undefined),
-    {
-      message: "assignedKeyword and assignedBacklink must be updated together",
-      path: ["assignedKeyword"],
-    },
-  );
+  });
 export type IdeaPatch = z.infer<typeof ideaPatchSchema>;
 
 export const regenerateIdeasSchema = z.object({

@@ -11,19 +11,28 @@ import {
   NotebookPen,
   TriangleAlert,
 } from "lucide-react";
+import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
 import { Progress } from "@/components/ui/Progress";
 import { cn } from "@/lib/cn";
-import type { BlogDTO, BlogStatus, IdeaDTO, SessionDTO } from "@/types";
+import { useGenerationCompleteNotification } from "@/lib/browserNotify";
+import type {
+  BlogDTO,
+  BlogStatus,
+  IdeaDTO,
+  ProjectDTO,
+  SessionDTO,
+} from "@/types";
 
 interface BlogProgressProps {
   sessionId: string;
   initialSession: SessionDTO;
+  initialProject: ProjectDTO;
   initialBlogs: BlogDTO[];
   initialIdeas: IdeaDTO[];
 }
 
-const POLL_INTERVAL_MS = 3000;
+const POLL_INTERVAL_MS = 5000;
 
 type CardState =
   | { kind: "queued"; idea: IdeaDTO; blog?: BlogDTO }
@@ -57,6 +66,7 @@ function isTerminal(state: CardState): boolean {
 export function BlogProgress({
   sessionId,
   initialSession,
+  initialProject,
   initialBlogs,
   initialIdeas,
 }: BlogProgressProps) {
@@ -147,19 +157,37 @@ export function BlogProgress({
   const pct = total === 0 ? 0 : ((completeCount + failedCount) / total) * 100;
   const allDone = states.every(isTerminal);
 
+  // Ping the OS notification center when the batch finishes — long runs
+  // (10+ blogs × ~60s) tempt the user to tab away. No-ops while the tab is
+  // focused or permission is denied.
+  useGenerationCompleteNotification({
+    status: session.status,
+    isRunning: session.status !== "done",
+    sessionName: initialSession.name,
+    completed: completeCount,
+    total,
+    url: `/session/${sessionId}/export`,
+  });
+
   return (
     <div className="flex flex-col">
       <header className="mb-8">
+        <Link
+          href={`/projects/${initialProject._id}`}
+          className="mb-3 inline-flex items-center gap-2 text-xs text-fg-muted hover:text-fg"
+        >
+          ← {initialProject.name}
+        </Link>
         <div className="flex items-end justify-between gap-4">
           <div>
             <p className="text-xs uppercase tracking-wider text-fg-muted">
-              Step 3 of 3
+              Step 3 of 3 · {initialSession.name}
             </p>
             <h1 className="mt-1 font-serif text-3xl font-semibold text-fg">
               Generating Blogs
             </h1>
             <p className="mt-2 text-sm text-fg-muted">
-              Automated editorial session in progress.
+              Automated editorial batch in progress.
             </p>
           </div>
           <div className="text-right">
@@ -317,8 +345,7 @@ function WritingCard({ idea, blog }: { idea: IdeaDTO; blog: BlogDTO }) {
           </div>
           <p className="mt-2 text-xs text-fg-muted">
             Streaming Markdown for a {idea.wordCountTarget.toLocaleString()}
-            -word post on{" "}
-            <span className="text-fg">{idea.assignedKeyword}</span>.
+            -word post.
           </p>
           <div className="mt-3 space-y-1.5" aria-hidden>
             <div className="h-2.5 w-3/4 animate-pulse rounded bg-surface-high/70" />

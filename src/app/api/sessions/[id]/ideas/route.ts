@@ -8,6 +8,7 @@ import {
   updateSessionStatus,
   type NewIdea,
 } from "@/lib/db";
+import { getProject } from "@/lib/projects";
 import { generateIdeasWithRetry } from "@/lib/ideas";
 
 export const runtime = "nodejs";
@@ -20,12 +21,12 @@ export async function GET(
   const { id } = await ctx.params;
 
   if (!ObjectId.isValid(id)) {
-    return Response.json({ error: "Invalid session id" }, { status: 400 });
+    return Response.json({ error: "Invalid batch id" }, { status: 400 });
   }
 
   const session = await getSession(id);
   if (!session) {
-    return Response.json({ error: "Session not found" }, { status: 404 });
+    return Response.json({ error: "Batch not found" }, { status: 404 });
   }
 
   const ideas = await listIdeas(id);
@@ -41,15 +42,20 @@ export async function POST(
   const { id } = await ctx.params;
 
   if (!ObjectId.isValid(id)) {
-    return Response.json({ error: "Invalid session id" }, { status: 400 });
+    return Response.json({ error: "Invalid batch id" }, { status: 400 });
   }
 
   const session = await getSession(id);
   if (!session) {
-    return Response.json({ error: "Session not found" }, { status: 404 });
+    return Response.json({ error: "Batch not found" }, { status: 404 });
   }
 
-  if (!session.siteAnalysis) {
+  const project = await getProject(session.projectId);
+  if (!project) {
+    return Response.json({ error: "Parent project not found" }, { status: 404 });
+  }
+
+  if (!project.siteAnalysis) {
     return Response.json(
       { error: "Site analysis must complete before generating ideas" },
       { status: 409 },
@@ -67,7 +73,7 @@ export async function POST(
 
   try {
     const generated = await generateIdeasWithRetry({
-      siteAnalysis: session.siteAnalysis,
+      siteAnalysis: project.siteAnalysis,
       keywordPairs: session.keywordPairs,
       blogCount: session.blogCount,
       wordCount: session.wordCount,
@@ -76,8 +82,6 @@ export async function POST(
     const docs: NewIdea[] = generated.map((idea) => ({
       title: idea.title,
       angle: idea.angle,
-      assignedKeyword: idea.assignedKeyword,
-      assignedBacklink: idea.assignedBacklink,
       searchIntent: idea.searchIntent,
       wordCountTarget: idea.wordCountTarget,
       primaryGapAddressed: idea.primaryGapAddressed,
@@ -89,7 +93,7 @@ export async function POST(
 
     const inserted = await bulkInsertIdeas(id, docs);
 
-    // Make sure the session sits at `ideas_pending` while the user reviews.
+    // Make sure the batch sits at `ideas_pending` while the user reviews.
     if (
       session.status !== "ideas_pending" &&
       session.status !== "ideas_approved"

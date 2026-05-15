@@ -51,28 +51,6 @@ export async function PATCH(
     );
   }
 
-  // If reassigning the keyword/backlink, both must come verbatim from the
-  // session's keywordPairs (paired together, not arbitrarily mixed).
-  if (
-    parsed.data.assignedKeyword !== undefined &&
-    parsed.data.assignedBacklink !== undefined
-  ) {
-    const isValidPair = session.keywordPairs.some(
-      (p) =>
-        p.keyword === parsed.data.assignedKeyword &&
-        p.backlink === parsed.data.assignedBacklink,
-    );
-    if (!isValidPair) {
-      return Response.json(
-        {
-          error:
-            "assignedKeyword + assignedBacklink must match an entry in the session's keywordPairs",
-        },
-        { status: 400 },
-      );
-    }
-  }
-
   const existing = await listIdeas(id);
   const target = existing.find((i) => i._id.toHexString() === ideaId);
   if (!target || target.deleted) {

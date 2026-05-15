@@ -24,7 +24,7 @@ export async function GET(
 
   const session = await getSession(id);
   if (!session) {
-    return Response.json({ error: "Session not found" }, { status: 404 });
+    return Response.json({ error: "Batch not found" }, { status: 404 });
   }
 
   const blog = await getBlog(blogId);
@@ -49,7 +49,8 @@ export async function GET(
 
   const ideas = await listIdeas(id);
   const idea = ideas.find((i) => i._id.equals(blog.ideaId));
-  const slug = slugifyBlog(idea?.title, blog._id.toHexString());
+  // Prefer the user-set blog.name (rename UI); fall back to the idea title.
+  const slug = slugifyBlog(blog.name ?? idea?.title, blog._id.toHexString());
 
   return new Response(content, {
     status: 200,

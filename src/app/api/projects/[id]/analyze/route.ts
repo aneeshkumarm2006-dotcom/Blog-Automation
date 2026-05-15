@@ -1,10 +1,10 @@
 // runtime = "nodejs" — Edge runtime is unsupported (Anthropic SDK + MongoDB driver require Node).
 import { ObjectId } from "mongodb";
 import {
-  getSession,
-  toClientSession,
-  updateSessionStatus,
-} from "@/lib/db";
+  getProject,
+  setProjectAnalysis,
+  toClientProject,
+} from "@/lib/projects";
 import { ANTHROPIC_MODEL, getAnthropicClient } from "@/lib/anthropic";
 import { SITE_ANALYSIS_SYSTEM_PROMPT } from "@/lib/prompts/site-analysis";
 import { siteAnalysisSchema, type SiteAnalysisData } from "@/lib/schemas";
@@ -83,31 +83,27 @@ export async function POST(
   const { id } = await ctx.params;
 
   if (!ObjectId.isValid(id)) {
-    return Response.json({ error: "Invalid session id" }, { status: 400 });
+    return Response.json({ error: "Invalid project id" }, { status: 400 });
   }
 
-  const session = await getSession(id);
-  if (!session) {
-    return Response.json({ error: "Session not found" }, { status: 404 });
+  const project = await getProject(id);
+  if (!project) {
+    return Response.json({ error: "Project not found" }, { status: 404 });
   }
 
-  // Idempotency: if we're already past the analyzing step, return current state.
-  if (
-    session.status !== "created" &&
-    session.status !== "analyzing" &&
-    session.status !== "failed"
-  ) {
-    return Response.json({ session: toClientSession(session) });
+  // Idempotency: if an analysis is already running, return current state.
+  if (project.analysisStatus === "analyzing") {
+    return Response.json({ project: toClientProject(project) });
   }
 
-  await updateSessionStatus(id, "analyzing");
+  await setProjectAnalysis(id, { status: "analyzing" });
 
   let analysis: SiteAnalysisData | undefined;
   let lastError: string | undefined;
 
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      analysis = await callAnthropic(session.websiteUrl);
+      analysis = await callAnthropic(project.websiteUrl);
       break;
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
@@ -116,16 +112,21 @@ export async function POST(
 
   if (!analysis) {
     const reason = `Site analysis failed: ${lastError ?? "unknown error"}`;
-    await updateSessionStatus(id, "failed", { failureReason: reason });
+    await setProjectAnalysis(id, {
+      status: "failed",
+      failureReason: reason,
+    });
     return Response.json({ error: reason }, { status: 502 });
   }
 
-  await updateSessionStatus(id, "ideas_pending", {
+  await setProjectAnalysis(id, {
+    status: "complete",
     siteAnalysis: analysis,
+    analyzedAt: new Date(),
   });
 
-  const fresh = await getSession(id);
+  const fresh = await getProject(id);
   return Response.json({
-    session: fresh ? toClientSession(fresh) : null,
+    project: fresh ? toClientProject(fresh) : null,
   });
 }

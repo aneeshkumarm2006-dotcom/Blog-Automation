@@ -32,26 +32,8 @@ export async function POST(
     );
   }
 
-  // Every live idea must reference a real keyword/backlink pair from the
-  // session — guards against UI drift if a pair was edited away.
-  for (const idea of live) {
-    const ok = session.keywordPairs.some(
-      (p) =>
-        p.keyword === idea.assignedKeyword &&
-        p.backlink === idea.assignedBacklink,
-    );
-    if (!ok) {
-      return Response.json(
-        {
-          error:
-            `Idea "${idea.title}" references a keyword/backlink pair that ` +
-            `is no longer in the session.`,
-        },
-        { status: 400 },
-      );
-    }
-  }
-
+  // Keyword pairs are shared across the whole batch (every blog embeds all of
+  // them), so there is no per-idea pair to validate before approval.
   await updateSessionStatus(id, "ideas_approved");
   const fresh = await getSession(id);
   return Response.json({

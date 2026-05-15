@@ -1,29 +1,29 @@
 import type { Metadata } from "next";
 import { AppShell } from "@/components/layout/AppShell";
-import { NewSessionForm } from "./NewSessionForm";
+import { NewProjectForm } from "./NewProjectForm";
 
 export const metadata: Metadata = {
-  title: "New Session — BlogForge",
+  title: "New Project — Blog Automation",
 };
 
-export default function NewSessionPage() {
+export default function NewProjectPage() {
   return (
     <AppShell>
       <header className="mb-8">
         <p className="text-xs uppercase tracking-wider text-fg-muted">
-          Step 1 of 3
+          Create a project
         </p>
         <h1 className="font-serif text-3xl font-semibold text-fg">
-          New Blog Session
+          New Project
         </h1>
         <p className="mt-2 max-w-prose text-sm text-fg-muted">
-          Point BlogForge at a site, attach the keyword/backlink pairs you want
-          to rank, and set the article length. We&apos;ll analyze the site and
-          draft blog ideas for your approval.
+          Give the project a name and point Blog Automation at the website. We&apos;ll
+          analyze the site once, then reuse the analysis on every batch of
+          blogs you generate inside it.
         </p>
       </header>
 
-      <NewSessionForm />
+      <NewProjectForm />
     </AppShell>
   );
 }
